@@ -1,0 +1,23 @@
+{
+  "name": "studybuddy",
+  "version": "1.0.0",
+  "description": "StudyBuddy - AI-powered study companion with quiz functionality",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "start": "npm run dev"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "keywords": [
+    "study",
+    "ai",
+    "quiz",
+    "education"
+  ],
+  "author": "StudyBuddy Team",
+  "license": "MIT"
+}
