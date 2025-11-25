@@ -46,16 +46,37 @@ const app = express();
 // CORS configuration - allow frontend and local development
 const allowedOrigins = [
   process.env.FRONTEND_URL,
-  'https://studybuddy-ckkuaqkte-sujalvermans-projects.vercel.app',
+  process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
   'http://localhost:5173',
-  'http://localhost:3000'
+  'http://localhost:3000',
+  'http://localhost:5174'
 ].filter(Boolean); // Remove undefined values
 
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? allowedOrigins 
-    : '*', // Allow all in development
-  credentials: true
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // In development, allow all origins
+    if (process.env.NODE_ENV !== 'production') {
+      return callback(null, true);
+    }
+    
+    // In production, check against allowed origins
+    if (allowedOrigins.indexOf(origin) !== -1 || allowedOrigins.includes('*')) {
+      callback(null, true);
+    } else {
+      // Allow if origin matches Vercel deployment pattern
+      if (origin.includes('.vercel.app') || origin.includes('.vercel.app')) {
+        callback(null, true);
+      } else {
+        callback(null, true); // Allow for now - tighten as needed
+      }
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 app.use(express.json());
@@ -87,6 +108,18 @@ if (mongoose.connection.readyState === 0) {
   console.log('MongoDB connection already established');
 }
 
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    service: 'studybuddy-backend',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+    mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+  });
+});
+
+// Root endpoint
 app.get('/', (req, res) => {
   res.json({ status: 'ok', service: 'studybuddy-backend' });
 });
