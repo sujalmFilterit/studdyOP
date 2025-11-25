@@ -90,18 +90,41 @@ const PORT = process.env.PORT || 4000;
 if (mongoose.connection.readyState === 0) {
   mongoose
     .connect(MONGO_URI, {
-      serverSelectionTimeoutMS: 5000,
+      serverSelectionTimeoutMS: 30000, // Increased from 5000 to 30000 (30 seconds)
       socketTimeoutMS: 45000,
+      connectTimeoutMS: 30000, // Added explicit connection timeout
       maxPoolSize: 10,
+      retryWrites: true,
+      w: 'majority',
     })
     .then(() => {
-      console.log('MongoDB connected');
+      console.log('MongoDB connected successfully');
+      console.log('MongoDB State:', mongoose.connection.readyState === 1 ? 'Connected' : 'Not Connected');
     })
     .catch((err) => {
-      console.error('MongoDB connection error', err);
+      console.error('MongoDB connection error:', err.message);
+      console.error('Full error:', err);
+      
+      // Provide helpful error messages
+      if (err.message.includes('IP')) {
+        console.error('\n⚠️  IP Whitelist Issue:');
+        console.error('1. Go to MongoDB Atlas → Network Access');
+        console.error('2. Add your IP address or use 0.0.0.0/0 for testing');
+        console.error('3. Wait 1-2 minutes after adding IP');
+      }
+      
+      if (err.message.includes('authentication')) {
+        console.error('\n⚠️  Authentication Issue:');
+        console.error('1. Check your username and password in MONGO_URI');
+        console.error('2. Make sure password is URL-encoded if it has special characters');
+      }
+      
       // Don't exit in serverless - let it retry on next request
       if (process.env.VERCEL !== '1') {
-        process.exit(1);
+        console.error('\n⚠️  Server will continue but MongoDB is not connected');
+        console.error('Some features may not work until MongoDB is connected\n');
+        // Don't exit - let the server run and retry
+        // process.exit(1);
       }
     });
 } else {
@@ -117,6 +140,32 @@ app.get('/api/health', (req, res) => {
     environment: process.env.NODE_ENV || 'development',
     mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
   });
+});
+
+// Diagnostic endpoint for troubleshooting
+app.get('/api/test-db', async (req, res) => {
+  try {
+    const dbState = mongoose.connection.readyState;
+    const states = {
+      0: 'disconnected',
+      1: 'connected',
+      2: 'connecting',
+      3: 'disconnecting'
+    };
+    
+    res.json({
+      mongodb: states[dbState] || 'unknown',
+      readyState: dbState,
+      env: {
+        MONGO_URI: process.env.MONGO_URI ? 'set' : 'not set',
+        JWT_SECRET: process.env.JWT_SECRET ? 'set' : 'not set',
+        NODE_ENV: process.env.NODE_ENV || 'not set'
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message, stack: e.stack });
+  }
 });
 
 // Root endpoint

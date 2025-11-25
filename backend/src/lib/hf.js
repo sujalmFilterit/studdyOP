@@ -1,14 +1,22 @@
 import { OpenAI } from 'openai';
 
-// Always use Hugging Face token from environment
-if (!process.env.HF_TOKEN) {
-  throw new Error('HF_TOKEN environment variable is required. Please set it in your environment variables.');
-}
+// Lazy initialization - only create client when needed
+let client = null;
 
-const client = new OpenAI({ 
-    baseURL: "https://router.huggingface.co/v1", 
-    apiKey: process.env.HF_TOKEN
-});
+function getClient() {
+  if (!process.env.HF_TOKEN) {
+    throw new Error('HF_TOKEN environment variable is required. Please set it in your environment variables.');
+  }
+  
+  if (!client) {
+    client = new OpenAI({ 
+      baseURL: "https://router.huggingface.co/v1", 
+      apiKey: process.env.HF_TOKEN
+    });
+  }
+  
+  return client;
+}
 
 export async function generateQuizViaHF(topic, difficulty, totalQuestions) {
     console.log('🤖 Generating quiz with HuggingFace AI (Quizzyfy approach)...');
@@ -68,7 +76,9 @@ Constraints:
 --- DOCUMENT END ---`;
 
     try {
-        const res = await client.chat.completions.create({
+        // Get client lazily (will throw if HF_TOKEN not set)
+        const hfClient = getClient();
+        const res = await hfClient.chat.completions.create({
             model: "deepseek-ai/DeepSeek-V3.1-Terminus:novita",
             messages: [
                 { role: "system", content: systemPrompt },
